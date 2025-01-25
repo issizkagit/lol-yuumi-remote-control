@@ -55,11 +55,12 @@ spell_keys = {
     config.get('Keys', 'go_to_base'): 'b',
 }
 
+# Level yükseltme tuşlarını yeniden eşleştir
 level_keys = {
-    config.get('Keys', 'level_up_q'): 'q',
-    config.get('Keys', 'level_up_w'): 'w',
-    config.get('Keys', 'level_up_e'): 'e',
-    config.get('Keys', 'level_up_r'): 'r'
+    'h': 'ctrl+q',  # Alt+H basılınca Ctrl+Q gönder
+    'j': 'ctrl+w',  # Alt+J basılınca Ctrl+W gönder
+    'k': 'ctrl+e',  # Alt+K basılınca Ctrl+E gönder
+    'l': 'ctrl+r'   # Alt+L basılınca Ctrl+R gönder
 }
 
 def check_key_press():
@@ -87,10 +88,10 @@ def check_key_press():
                     time.sleep(0.1)
 
             # Level yükseltme tuşlarını kontrol et
-            for key, ability in level_keys.items():
+            for key, combo in level_keys.items():
                 if win32api.GetAsyncKeyState(ord(key.upper())) & 0x8000:
-                    print(f'{key} key pressed (level up {ability})')
-                    level_data = {'ability': ability}
+                    print(f'{key} key pressed (sending {combo})')
+                    level_data = {'ability': combo}
                     send_request(level_url, level_data)
                     time.sleep(0.1)
 
