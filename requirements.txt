@@ -2,3 +2,4 @@ requests
 pynput
 configparser
 flask
+keyboard
