@@ -1,5 +1,5 @@
 requests
-pynput
+pyautogui
+pywin32
 configparser
 flask
-keyboard

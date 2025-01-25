@@ -1,8 +1,9 @@
 import sys
 import requests
 import threading
-import keyboard
-import mouse
+import pyautogui
+import win32api
+import win32con
 import time
 import configparser
 
@@ -18,9 +19,7 @@ click_url = f'http://{yuumi_pc_ip}:{server_port}/click'
 spell_url = f'http://{yuumi_pc_ip}:{server_port}/spell'
 level_url = f'http://{yuumi_pc_ip}:{server_port}/level'
 
-ALT_KEY = config.get('Keys', 'yuumi_enable_controls_key')
 alt_pressed = False
-
 action_delay = 0.5
 last_action_time = 0
 
@@ -34,52 +33,14 @@ except requests.exceptions.ConnectionError:
 
 def send_request(url, json_data):
     try:
-        requests.post(url, json=json_data, timeout=5.0)
+        response = requests.post(url, json=json_data, timeout=5.0)
+        if response.status_code != 200:
+            print(f"Error: Server returned {response.status_code}")
+            print(f"Response: {response.json()}")
     except requests.exceptions.Timeout:
         print("Request timed out")
-
-def on_key_press(event):
-    global running, alt_pressed
-
-    # Handle key presses for abilities and summoner spells
-    if alt_pressed and event.name in key_config:
-        action = key_config[event.name]
-        print(f'{event.name} key pressed')
-        spell_data = {'action': action}
-        send_request(spell_url, spell_data)
-
-def on_hotkey_press():
-    global alt_pressed
-    alt_pressed = True
-    print('ALT key pressed')
-
-def on_hotkey_release():
-    global alt_pressed
-    alt_pressed = False
-    print('ALT key released')
-
-def on_click(event):
-    global last_action_time, action_delay, last_action
-
-    if alt_pressed and not event.pressed:
-        current_time = time.time()
-        if current_time - last_action_time >= action_delay:
-            x, y = mouse.get_position()
-            button = 'left' if event.button == mouse.LEFT else 'right'
-            print(f'{button} button clicked at ({x}, {y})')
-            click_data = {'mouse_x': x, 'mouse_y': y, 'button': button}
-            
-            # Create and start a new thread for sending the request
-            request_thread = threading.Thread(target=send_request, args=(click_url, click_data))
-            request_thread.start()
-
-            last_action_time = current_time
-            last_action = None
-
-# Setup event listeners
-alt_key = "alt"
-keyboard.on_press_key(alt_key, lambda _: on_hotkey_press())
-keyboard.on_release_key(alt_key, lambda _: on_hotkey_release())
+    except Exception as e:
+        print(f"Error sending request: {str(e)}")
 
 # Setup key bindings
 key_config = {
@@ -98,10 +59,57 @@ key_config = {
     config.get('Keys', 'level_up_r'): 'l'
 }
 
-for key in key_config:
-    keyboard.on_press_key(key, on_key_press)
+def check_key_press():
+    global alt_pressed, last_action_time
+    
+    while running:
+        # Alt tuşu kontrolü
+        if win32api.GetAsyncKeyState(win32con.VK_MENU) & 0x8000:
+            if not alt_pressed:
+                alt_pressed = True
+                print('ALT key pressed')
+        else:
+            if alt_pressed:
+                alt_pressed = False
+                print('ALT key released')
 
-mouse.on_click(on_click)
+        # Diğer tuşların kontrolü
+        if alt_pressed:
+            for key, action in key_config.items():
+                if win32api.GetAsyncKeyState(ord(key.upper())) & 0x8000:
+                    print(f'{key} key pressed')
+                    spell_data = {'action': action}
+                    send_request(spell_url, spell_data)
+                    time.sleep(0.1)  # Tuş tekrarını önlemek için
+
+            # Fare tıklamalarını kontrol et
+            if win32api.GetAsyncKeyState(win32con.VK_LBUTTON) & 0x8000:
+                current_time = time.time()
+                if current_time - last_action_time >= action_delay:
+                    x, y = pyautogui.position()
+                    print(f'left button clicked at ({x}, {y})')
+                    click_data = {'mouse_x': x, 'mouse_y': y, 'button': 'left'}
+                    send_request(click_url, click_data)
+                    last_action_time = current_time
+                    time.sleep(0.1)
+
+            if win32api.GetAsyncKeyState(win32con.VK_RBUTTON) & 0x8000:
+                current_time = time.time()
+                if current_time - last_action_time >= action_delay:
+                    x, y = pyautogui.position()
+                    print(f'right button clicked at ({x}, {y})')
+                    click_data = {'mouse_x': x, 'mouse_y': y, 'button': 'right'}
+                    send_request(click_url, click_data)
+                    last_action_time = current_time
+                    time.sleep(0.1)
+
+        time.sleep(0.01)  # CPU kullanımını azaltmak için
+
+print("Client is running. Press ALT + key to control Yuumi.")
+
+# Start key checking thread
+key_thread = threading.Thread(target=check_key_press, daemon=True)
+key_thread.start()
 
 # Main loop
 while running:
