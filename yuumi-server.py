@@ -53,6 +53,20 @@ def press_key(key):
         print(f"Key press error ({key}): {str(e)}")
         return False
 
+def press_key_combo(combo):
+    """Tuş kombinasyonunu basma işlemi"""
+    try:
+        if '+' in combo:
+            modifier, key = combo.split('+')
+            with pyautogui.hold(modifier):
+                pyautogui.press(key)
+        else:
+            pyautogui.press(combo)
+        return True
+    except Exception as e:
+        print(f"Key press error: {str(e)}")
+        return False
+
 @app.route('/spell', methods=['POST'])
 def handle_spell():
     try:
@@ -98,13 +112,12 @@ def handle_click():
 @app.route('/level', methods=['POST'])
 def handle_level():
     try:
-        ability = request.json['ability']
-        print(f'Leveling up ability: {ability}')
+        combo = request.json['ability']
+        print(f'Pressing key combo: {combo}')
         
-        if press_key(ability):
+        if press_key_combo(combo):
             return jsonify({'success': True})
-        else:
-            return jsonify({'error': f'Failed to press key: {ability}'}), 500
+        return jsonify({'error': f'Failed to press key combo: {combo}'}), 500
             
     except Exception as e:
         print(f'Error in handle_level: {str(e)}')

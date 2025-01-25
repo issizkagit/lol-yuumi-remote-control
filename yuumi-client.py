@@ -43,7 +43,7 @@ def send_request(url, json_data):
         print(f"Error sending request: {str(e)}")
 
 # Setup key bindings
-key_config = {
+spell_keys = {
     config.get('Keys', 'spell_q'): 'q',
     config.get('Keys', 'spell_w'): 'w',
     config.get('Keys', 'spell_e'): 'e',
@@ -53,10 +53,13 @@ key_config = {
     config.get('Keys', 'open_shop'): 'p',
     config.get('Keys', 'tab_info'): 'o',
     config.get('Keys', 'go_to_base'): 'b',
-    config.get('Keys', 'level_up_q'): 'h',
-    config.get('Keys', 'level_up_w'): 'j',
-    config.get('Keys', 'level_up_e'): 'k',
-    config.get('Keys', 'level_up_r'): 'l'
+}
+
+level_keys = {
+    config.get('Keys', 'level_up_q'): 'q',
+    config.get('Keys', 'level_up_w'): 'w',
+    config.get('Keys', 'level_up_e'): 'e',
+    config.get('Keys', 'level_up_r'): 'r'
 }
 
 def check_key_press():
@@ -75,12 +78,21 @@ def check_key_press():
 
         # Diğer tuşların kontrolü
         if alt_pressed:
-            for key, action in key_config.items():
+            # Spell tuşlarını kontrol et
+            for key, action in spell_keys.items():
                 if win32api.GetAsyncKeyState(ord(key.upper())) & 0x8000:
-                    print(f'{key} key pressed')
+                    print(f'{key} key pressed (spell)')
                     spell_data = {'action': action}
                     send_request(spell_url, spell_data)
-                    time.sleep(0.1)  # Tuş tekrarını önlemek için
+                    time.sleep(0.1)
+
+            # Level yükseltme tuşlarını kontrol et
+            for key, ability in level_keys.items():
+                if win32api.GetAsyncKeyState(ord(key.upper())) & 0x8000:
+                    print(f'{key} key pressed (level up {ability})')
+                    level_data = {'ability': ability}
+                    send_request(level_url, level_data)
+                    time.sleep(0.1)
 
             # Fare tıklamalarını kontrol et
             if win32api.GetAsyncKeyState(win32con.VK_LBUTTON) & 0x8000:
