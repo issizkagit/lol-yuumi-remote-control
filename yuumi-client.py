@@ -1,7 +1,8 @@
 import sys
 import requests
 import threading
-from pynput import mouse, keyboard
+import keyboard
+import mouse
 import time
 import configparser
 
@@ -17,7 +18,7 @@ click_url = f'http://{yuumi_pc_ip}:{server_port}/click'
 spell_url = f'http://{yuumi_pc_ip}:{server_port}/spell'
 level_url = f'http://{yuumi_pc_ip}:{server_port}/level'
 
-ALT_KEY = keyboard.Key[config.get('Keys', 'yuumi_enable_controls_key')]
+ALT_KEY = config.get('Keys', 'yuumi_enable_controls_key')
 alt_pressed = False
 
 action_delay = 0.5
@@ -37,52 +38,36 @@ def send_request(url, json_data):
     except requests.exceptions.Timeout:
         print("Request timed out")
 
-def on_key_press(key):
+def on_key_press(event):
     global running, alt_pressed
 
     # Handle key presses for abilities and summoner spells
-    if alt_pressed and hasattr(key, 'char'):
-        key_config = {
-            config.get('Keys', 'spell_q'): 'q',
-            config.get('Keys', 'spell_w'): 'w',
-            config.get('Keys', 'spell_e'): 'e',
-            config.get('Keys', 'spell_r'): 'r',
-            config.get('Keys', 'spell_d'): 'd',
-            config.get('Keys', 'spell_f'): 'f',
-            config.get('Keys', 'open_shop'): 'p',
-            config.get('Keys', 'tab_info'): 'o',
-            config.get('Keys', 'go_to_base'): 'b',
-            config.get('Keys', 'level_up_q'): 'h',
-            config.get('Keys', 'level_up_w'): 'j',
-            config.get('Keys', 'level_up_e'): 'k',
-            config.get('Keys', 'level_up_r'): 'l'
-        }
-        action = key_config.get(key.char, None)
-        if action:
-            print(f'{key.char} key pressed')
-            spell_data = {'action': action}
-            send_request(spell_url, spell_data)
+    if alt_pressed and event.name in key_config:
+        action = key_config[event.name]
+        print(f'{event.name} key pressed')
+        spell_data = {'action': action}
+        send_request(spell_url, spell_data)
 
-def on_hotkey_press(key):
+def on_hotkey_press():
     global alt_pressed
-    if key == ALT_KEY:
-        alt_pressed = True
-        print('ALT key pressed')
+    alt_pressed = True
+    print('ALT key pressed')
 
-def on_hotkey_release(key):
+def on_hotkey_release():
     global alt_pressed
-    if key == ALT_KEY:
-        alt_pressed = False
-        print('ALT key released')
+    alt_pressed = False
+    print('ALT key released')
 
-def on_click(x, y, button, pressed):
+def on_click(event):
     global last_action_time, action_delay, last_action
 
-    if alt_pressed and not pressed:
+    if alt_pressed and not event.pressed:
         current_time = time.time()
         if current_time - last_action_time >= action_delay:
-            print(f'{button.name} button clicked at ({x}, {y})')
-            click_data = {'mouse_x': x, 'mouse_y': y, 'button': button.name}
+            x, y = mouse.get_position()
+            button = 'left' if event.button == mouse.LEFT else 'right'
+            print(f'{button} button clicked at ({x}, {y})')
+            click_data = {'mouse_x': x, 'mouse_y': y, 'button': button}
             
             # Create and start a new thread for sending the request
             request_thread = threading.Thread(target=send_request, args=(click_url, click_data))
@@ -91,14 +76,33 @@ def on_click(x, y, button, pressed):
             last_action_time = current_time
             last_action = None
 
-mouse_listener = mouse.Listener(on_click=on_click, daemon=True)
-mouse_listener.start()
+# Setup event listeners
+alt_key = "alt"
+keyboard.on_press_key(alt_key, lambda _: on_hotkey_press())
+keyboard.on_release_key(alt_key, lambda _: on_hotkey_release())
 
-hotkey_listener = keyboard.Listener(on_press=on_hotkey_press, on_release=on_hotkey_release, daemon=True)
-hotkey_listener.start()
+# Setup key bindings
+key_config = {
+    config.get('Keys', 'spell_q'): 'q',
+    config.get('Keys', 'spell_w'): 'w',
+    config.get('Keys', 'spell_e'): 'e',
+    config.get('Keys', 'spell_r'): 'r',
+    config.get('Keys', 'spell_d'): 'd',
+    config.get('Keys', 'spell_f'): 'f',
+    config.get('Keys', 'open_shop'): 'p',
+    config.get('Keys', 'tab_info'): 'o',
+    config.get('Keys', 'go_to_base'): 'b',
+    config.get('Keys', 'level_up_q'): 'h',
+    config.get('Keys', 'level_up_w'): 'j',
+    config.get('Keys', 'level_up_e'): 'k',
+    config.get('Keys', 'level_up_r'): 'l'
+}
 
-keyboard_listener = keyboard.Listener(on_press=on_key_press, daemon=True)
-keyboard_listener.start()
+for key in key_config:
+    keyboard.on_press_key(key, on_key_press)
 
+mouse.on_click(on_click)
+
+# Main loop
 while running:
     time.sleep(1)
